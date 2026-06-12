@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from .ST_block import SpatioTemporalBlock
 from .node_attribute_encoder import NodeAttributeEncoder
 import os
-from languageEncoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
+from models.languageEncoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
 from models.multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, MultiChoiceClassifier, MultiChoices
 
 
