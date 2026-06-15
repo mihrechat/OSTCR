@@ -13,7 +13,7 @@ from torch_geometric.utils import softmax as pyg_softmax
 import os
 from torch_geometric.utils import dropout_edge
 from Language_Encoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
-from multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, OpenEndedClassification
+from multiEncoder.cross_encoder_updated import OSTCRModule_Transformer, OpenEndedClassification
 from torch_scatter import scatter_mean
 from torch_scatter import scatter, scatter_sum
 
@@ -78,7 +78,7 @@ class STGraphTransformerNet(nn.Module):
         )
         self.edge_embed = nn.Embedding(cfg.model.num_preds, self.edge_dim)
         
-        self.visual_question  = GraphSTCausalMotion_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens, cfg.model.causal_num_tokens)
+        self.visual_question  = OSTCRModule_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens, cfg.model.causal_num_tokens)
         
    
         self.blocks = nn.ModuleList([
