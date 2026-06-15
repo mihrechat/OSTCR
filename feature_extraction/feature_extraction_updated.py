@@ -14,7 +14,7 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 
 
 
-
+# please download swin, resnet and timesformer pretrained models
 swin_path = '/root/autodl-tmp/swin/swin_base_patch4_window7_224.pth'
 time_path = '/root/autodl-tmp/model/models--facebook--timesformer-base-finetuned-k400/snapshots/8aaf40ea7d3d282dcb0a5dea01a198320d15d6c0'
 
@@ -76,14 +76,7 @@ def get_frames(video_path):
         from decord import VideoReader, cpu
         vr = VideoReader(video_path, ctx=cpu(0))
         return [Image.fromarray(vr[i].asnumpy()) for i in range(len(vr))]
-"""
-Video Feature Extraction with Swin3D Transformer
-✅ Extracts ALL frames (no redundant skipping)
-✅ Uses batched processing (efficient)
-✅ Multi-scale features (layer1-4)
-✅ Full temporal resolution (no 50% loss)
-✅ Production-ready
-"""
+
 
 import os
 import json
@@ -214,7 +207,7 @@ class HybridVideoFeatureExtractor:
         # TIMESFORMER MOTION BACKBONE
         # ==========================================================
 
-        print("🔧 Loading TimeSformer motion backbone...")
+        print(" Loading TimeSformer motion backbone...")
 
         # config = TimesformerConfig.from_pretrained(
         #     timesformer_path
@@ -261,7 +254,7 @@ class HybridVideoFeatureExtractor:
             )
         ])
 
-        print(f"\n✅ Hybrid extractor ready!")
+        print(f"\n Hybrid extractor ready!")
         print(f"   Visual dim : {self.visual_dim}")
         print(f"   Motion dim : {self.motion_dim}")
         print(f"   Num clips  : {num_clips}")
@@ -682,19 +675,7 @@ def process_video_all_frames(
     feature_extractor: HybridVideoFeatureExtractor,
     k_objects: Optional[int] = None,
 ) -> None:
-    """
-    ✅ Extract features for ALL frames (no keyframe detection!)
-    ✅ Batched multi-scale feature extraction
-    ✅ Full temporal resolution preserved
     
-    Args:
-        video_path: Directory containing video files
-        json_dir: Directory containing JSON annotations
-        save_root: Where to save features
-        video_name: Video filename (e.g., "video_001.mp4")
-        feature_extractor: VideoSwinFeatureExtractor instance
-        k_objects: Limit to top-k objects per frame (None = all)
-    """
     
     os.makedirs(save_root, exist_ok=True)
     video_id = os.path.splitext(video_name)[0]
@@ -724,7 +705,7 @@ def process_video_all_frames(
     ])
     
     if all_exist:
-        print(f"✅ All features already exist. Skipping.")
+        print(f" All features already exist. Skipping.")
         return
 
     # # ── Load video and metadata ────────────────────────────────────
@@ -733,7 +714,7 @@ def process_video_all_frames(
 
     # If JSON doesn't exist, remove video and return
     if not os.path.exists(json_path):
-        print(f"❌ JSON annotation not found for {video_id}. Skipping.")
+        print(f" JSON annotation not found for {video_id}. Skipping.")
         video_file_path = os.path.join(video_path, video_name)
         if os.path.exists(video_file_path):
             #use shutil.rmtree() to ensure deletion of video file
@@ -750,7 +731,7 @@ def process_video_all_frames(
 
     # If frame indices are less than 1, remove both files
     if len(frame_indices) < 1:
-        print(f"❌ No valid frames in JSON for {video_id}. Skipping.")
+        print(f" No valid frames in JSON for {video_id}. Skipping.")
         # Remove JSON
         if os.path.exists(json_path):
             shutil.rmtree(json_path, ignore_errors=True)
@@ -767,7 +748,7 @@ def process_video_all_frames(
     # json_path = os.path.join(json_dir, video_id + ".json")
     # #if json doesn't exists remove the video and return
     # if not os.path.exists(json_path):
-    #     print(f"❌ JSON annotation not found for {video_id}. Skipping.")
+    #     print(f"  JSON annotation not found for {video_id}. Skipping.")
     #     #remove the video file as well since it's not useful without annotation
     #     video_file_path = os.path.join(video_path, video_name)
     #     if os.path.exists(video_file_path):
@@ -786,7 +767,7 @@ def process_video_all_frames(
     
     # # if frame indices are less than 1, just remove the vide and json
     # if len(frame_indices) < 1:
-    #     print(f"❌ No valid frames in JSON for {video_id}. Skipping.")
+    #     print(f"  No valid frames in JSON for {video_id}. Skipping.")
     #     # remove json
     #     if os.path.exists(json_path):
     #         os.remove(json_path)
@@ -822,14 +803,14 @@ def process_video_all_frames(
     # - 'temporal_features': (T, 1024)
 
     # Save motion features
-    print(f"\n💾 Saving motion features...")
+    print(f"\n Saving motion features...")
     motion_features = features_dict['motion_features']
     if not os.path.exists(motion_path):
         np.save(motion_path, motion_features)
-        print(f"   ✅ motion_features.npy: shape {motion_features.shape}")
+        print(f"    motion_features.npy: shape {motion_features.shape}")
 
     # ── Phase 2: Per-frame, per-object feature extraction ──────────
-    print(f"\n👁️  Extracting per-object features...")
+    print(f"\n  Extracting per-object features...")
     
     node_layer1_list = []
     node_layer2_list = []
@@ -914,7 +895,7 @@ def process_video_all_frames(
         total_objects += n_valid
 
     # ── Stack features ────────────────────────────────────────────
-    print(f"\n📦 Stacking features...")
+    print(f"\n Stacking features...")
     
     node_layer1 = np.concatenate(node_layer1_list, axis=0) if node_layer1_list else np.array([], dtype=np.float16)
     node_layer2 = np.concatenate(node_layer2_list, axis=0) if node_layer2_list else np.array([], dtype=np.float16)
@@ -927,23 +908,23 @@ def process_video_all_frames(
     print(f"   node_layer4: {node_layer4.shape}")
 
     # ── Save features ──────────────────────────────────────────────
-    print(f"\n💾 Saving features to disk...")
+    print(f"\n Saving features to disk...")
     
     if not os.path.exists(node_layer1_path):
         np.save(node_layer1_path, node_layer1)
-        print(f"   ✅ node_layer1.npy saved")
+        print(f"    node_layer1.npy saved")
     
     if not os.path.exists(node_layer2_path):
         np.save(node_layer2_path, node_layer2)
-        print(f"   ✅ node_layer2.npy saved")
+        print(f"    node_layer2.npy saved")
     
     if not os.path.exists(node_layer3_path):
         np.save(node_layer3_path, node_layer3)
-        print(f"   ✅ node_layer3.npy saved")
+        print(f"    node_layer3.npy saved")
     
     if not os.path.exists(node_layer4_path):
         np.save(node_layer4_path, node_layer4)
-        print(f"   ✅ node_layer4.npy saved")
+        print(f"   node_layer4.npy saved")
 
     # ── Save metadata ──────────────────────────────────────────────
     print(f"\n📝 Saving metadata...")
@@ -967,7 +948,7 @@ def process_video_all_frames(
     with open(meta_path, "w") as f:
         json.dump(to_python(metadata), f, indent=4)
     
-    print(f"   ✅ node_metadata.json saved")
+    print(f"    node_metadata.json saved")
 
     # ── Cleanup ────────────────────────────────────────────────────
     print(f"\n🧹 Cleaning up...")
@@ -977,10 +958,10 @@ def process_video_all_frames(
     torch.cuda.empty_cache()
 
     print(f"\n{'='*70}")
-    print(f"✅ COMPLETED: {video_id}")
-    print(f"   📊 Total objects: {total_objects}")
-    print(f"   📹 All {len(all_pil_frames)} frames processed (NO SKIPPING!)")
-    print(f"   🎯 Full temporal resolution preserved!")
+    print(f" COMPLETED: {video_id}")
+    print(f"    Total objects: {total_objects}")
+    print(f"    All {len(all_pil_frames)} frames processed (NO SKIPPING!)")
+    print(f"    Full temporal resolution preserved!")
     print(f"{'='*70}\n")
 
 
@@ -1016,7 +997,7 @@ def process_video_all_frames(
 #     if max_videos:
 #         video_files = video_files[:max_videos]
     
-#     print(f"\n🎬 Starting batch processing...")
+#     print(f"\n Starting batch processing...")
 #     print(f"   Total videos to process: {len(video_files)}")
 #     print(f"   Save directory: {save_root}\n")
 
@@ -1033,11 +1014,11 @@ def process_video_all_frames(
 #                 k_objects=k_objects,
 #             )
 #         except Exception as e:
-#             print(f"❌ ERROR: {str(e)}")
+#             print(f" ERROR: {str(e)}")
 #             continue
 
 #     print(f"\n{'='*70}")
-#     print(f"✅ BATCH PROCESSING COMPLETE!")
+#     print(f" BATCH PROCESSING COMPLETE!")
 #     print(f"   Processed: {len(video_files)} videos")
 #     print(f"   Features saved to: {save_root}")
 #     print(f"{'='*70}\n")
@@ -1148,10 +1129,10 @@ def process_video_dataset(
         #     motion_feat = np.load(motion_feat_path)
 
         #     if motion_feat.shape != (num_clips, motion_dim ):
-        #         print(f"❌ Incorrect shape for motion_features.npy in {video_id}. Expected {(num_clips, motion_dim)}, got {motion_feat.shape}")
+        #         print(f" Incorrect shape for motion_features.npy in {video_id}. Expected {(num_clips, motion_dim)}, got {motion_feat.shape}")
         #         #remove the folder that motion_features.npy is in since it is not correct
         #         os.remove(motion_feat_path)
-        #         print(f'   🧹 Removed incorrect motion_features.npy for {video_id}')
+        #         print(f'    Removed incorrect motion_features.npy for {video_id}')
         #         already_done = False
                 
                 
@@ -1186,7 +1167,7 @@ def process_video_dataset(
 
             print(
                 f"[{idx}/{len(video_files)}] "
-                f"⏭️ Skipping {video_id}"
+                f" Skipping {video_id}"
             )
 
             continue
@@ -1197,7 +1178,7 @@ def process_video_dataset(
 
         print(
             f"[{idx}/{len(video_files)}] "
-            f"🎬 Processing {video_id}"
+            f" Processing {video_id}"
         )
 
         try:
@@ -1218,20 +1199,20 @@ def process_video_dataset(
             failed += 1
 
             print(
-                f"❌ ERROR in {video_id}: {str(e)}"
+                f" ERROR in {video_id}: {str(e)}"
             )
 
             continue
 
     print(f"\n{'='*70}")
-    print("✅ BATCH PROCESSING COMPLETE!")
+    print(" BATCH PROCESSING COMPLETE!")
     print(f"{'='*70}")
 
     print(f"Processed : {processed}")
     print(f"Skipped   : {skipped}")
     print(f"Failed    : {failed}")
 
-    print(f"\n📁 Features saved to:")
+    print(f"\n Features saved to:")
     print(save_root)
 
     print(f"{'='*70}\n")
@@ -1270,5 +1251,5 @@ if __name__ == "__main__":
         max_videos=None,  # None = all videos, or set to N for testing
     )
 
-    print("\n🎉 Feature extraction pipeline complete!")
+    print("\n Feature extraction pipeline complete!")
     
