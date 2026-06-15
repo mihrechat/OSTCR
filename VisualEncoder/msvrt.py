@@ -12,9 +12,8 @@ from .node_attribute_encoder import NodeAttributeEncoder
 from torch_geometric.utils import softmax as pyg_softmax
 import os
 from torch_geometric.utils import dropout_edge
-from .moe_fusion import  MoELinearFusion
-from languageEncoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
-from models.multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, FinalVQAClassifier, OutputUnitOpenEnded_ST, OpenEndedClassification
+from Language_Encoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
+from multiEncoder.cross_encoder_updated import OSTCRModule_Transformer, OpenEndedClassification
 from torch_scatter import scatter_mean
 from torch_scatter import scatter, scatter_sum
 
@@ -22,12 +21,6 @@ from torch_geometric.utils import to_dense_batch
 import math
 
 
-
-
-
-# ==================================================================
-# 1. Triplet Prior Bank (M) — Edge-level Causal Mechanism
-# ==================================================================
 class ConceptNetTripletBank(nn.Module):
     """
     O(1) Lookup Table for Precomputed ConceptNet Triplets.
@@ -63,130 +56,6 @@ class ConceptNetTripletBank(nn.Module):
         """
         return self.lookup_table[src_cls_ids, dst_cls_ids]
 
-# ==================================================================
-# 2. Visual Prototype Memory (E_v) — Scene-level Backdoor
-# ==================================================================
-
-class VisualPrototypeMemory(nn.Module):
-    """
-    Video-level visual prototype memory bank.
-    Tracks scene-level visual priors via EMA.
-    """
-
-    def __init__(
-        self,
-        num_prototypes: int = 64,
-        dim: int = 512,
-        momentum: float = 0.999,
-        min_count: int = 10
-    ):
-        super().__init__()
-
-        self.momentum = momentum
-        self.min_count = min_count
-        self.K = num_prototypes
-
-        init_protos = torch.randn(num_prototypes, dim) * 0.02
-
-        self.register_buffer(
-            "prototypes",
-            init_protos
-        )
-
-        self.register_buffer(
-            "update_counts",
-            torch.zeros(num_prototypes)
-        )
-
-    @torch.no_grad()
-    def update(
-        self,
-        node_feat: torch.Tensor,
-        batch_idx: torch.Tensor,
-        num_graphs: int
-    ):
-
-        video_reprs = []
-
-        # =====================================================
-        # Per-video mean feature
-        # =====================================================
-        for b in range(num_graphs):
-
-            mask = (batch_idx == b)
-
-            if mask.sum() == 0:
-                continue
-
-            # [dim]
-            v_repr = node_feat[mask].mean(dim=0)
-
-            video_reprs.append(v_repr)
-
-        if len(video_reprs) == 0:
-            return
-
-        # [B, dim]
-        video_reprs = torch.stack(video_reprs)
-
-        # =====================================================
-        # Prototype assignment
-        # =====================================================
-        # sim = video_reprs @ self.prototypes.T
-        
-        sim = (F.normalize(video_reprs, dim=-1)
-                @ F.normalize(self.prototypes, dim=-1).T)
-
-        assignments = sim.argmax(dim=-1)
-
-        # =====================================================
-        # EMA prototype update
-        # =====================================================
-        for k in range(self.K):
-
-            assigned = video_reprs[assignments == k]
-
-            if assigned.shape[0] == 0:
-                continue
-
-            new_feat = assigned.mean(dim=0)
-
-            self.prototypes[k] = (
-                self.momentum * self.prototypes[k]
-                + (1 - self.momentum) * new_feat
-            )
-
-            self.update_counts[k] += assigned.shape[0]
-
-    def get_expected_visual(self) -> torch.Tensor:
-        """
-        Returns:
-            E[v] : [1, dim]
-        """
-
-        reliable = self.update_counts >= self.min_count
-
-        # fallback
-        if reliable.sum() == 0:
-
-            return self.prototypes.mean(
-                dim=0,
-                keepdim=True
-            )
-
-        valid_protos = self.prototypes[reliable]
-
-        valid_counts = self.update_counts[reliable]
-
-        weights = valid_counts / valid_counts.sum()
-
-        E_v = (
-            valid_protos
-            * weights.unsqueeze(1)
-        ).sum(dim=0, keepdim=True)
-
-        return E_v
-
 
 class STGraphTransformerNet(nn.Module):
     """
@@ -209,7 +78,7 @@ class STGraphTransformerNet(nn.Module):
         )
         self.edge_embed = nn.Embedding(cfg.model.num_preds, self.edge_dim)
         
-        self.visual_question  = GraphSTCausalMotion_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens, cfg.model.causal_num_tokens)
+        self.visual_question  = OSTCRModule_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens, cfg.model.causal_num_tokens)
         
    
         self.blocks = nn.ModuleList([
@@ -226,13 +95,6 @@ class STGraphTransformerNet(nn.Module):
             qrole_pt_path=cfg.data.qrole_pt_path
         )
       
-
-        # ── Stage 8: Causal Memory
-        self.visual_memory = VisualPrototypeMemory(
-            num_prototypes=cfg.model.num_prototypes,
-            dim=self.dim,
-            momentum=cfg.model.prototype_momentum
-        )
         
         self.conceptnet_prior = ConceptNetExpectedPriorBank(
             prior_pt_path=cfg.data.prior_pt_path,
@@ -242,7 +104,7 @@ class STGraphTransformerNet(nn.Module):
         
         self.gate_graph = nn.Parameter(torch.zeros(self.dim))
         
-        self.final_mlp4 = OpenEndedClassification(self.dim, cfg.model.msvrt_vocab_size)
+        self.final_mlp4 = OpenEndedClassification(self.dim, cfg.model.msvd_vocab_size)
         
         self.W_q = nn.Linear(cfg.model.concept_dim, cfg.model.concept_dim)
         self.W_k = nn.Linear(cfg.model.concept_dim, cfg.model.concept_dim)
@@ -253,37 +115,27 @@ class STGraphTransformerNet(nn.Module):
                                         nn.GELU(),
                                         nn.Dropout(p=0.1),                                             
                                                 )
-        
+
   
         # ── Temperature & Gates
         self.logit_temp = nn.Parameter(
             torch.clamp(torch.tensor(1.0, dtype=torch.float32), min=0.1, max=2.0)
         )
     
-    def _compute_causal_signals(
+    def compute_causal_signal(
             self,
             cls_id: torch.Tensor,
             batch_idx: torch.Tensor,
             B: int
         ) -> tuple:
-            """
-            Compute causal signals with proper error handling.
-            """
-            device = cls_id.device
-            
-            # 1. Expected Visual Prior
-            # E_v_global = self.visual_memory.get_expected_visual()  # (1, dim)
-            # E_v = E_v_global.expand(B, -1)  # (B, dim)
-            # E_v = self.E_v_proj(E_v)  # (B, dim)
-            
-            # 2. Expected Semantic Prior
+         
             E_z_nodes = self.conceptnet_prior(cls_id)  # (N, concept_dim)
             E_z = global_mean_pool(E_z_nodes, batch_idx)  # (B, concept_dim)
             return E_z
     
     
 
-    def compute_graph_relational(
+    def compute_graph_relation(
         self,
         node_feature,      # [N,d]
         s_idx,             # [2,E]
@@ -326,19 +178,16 @@ class STGraphTransformerNet(nn.Module):
 
             return pooled_triplets, triplet_mask, triplet_batch_idx
 
-        # =====================================================
-        # Edge index
-        # =====================================================
 
         src, dst = s_idx[0], s_idx[1]
 
-        edge_batch = batch_idx[src]        
+        edge_batch = batch_idx[src]          # [E]
 
 
-        v_src = node_feature[src]           
-        v_dst = node_feature[dst]          
+        v_src = node_feature[src]            # [E,d]
+        v_dst = node_feature[dst]            # [E,d]
 
-        edge_context = v_src + v_dst         
+        edge_context = v_src + v_dst         # [E,d]
 
         # [E,K,d]
         E_T = self.conceptnet_triplets(
@@ -373,7 +222,6 @@ class STGraphTransformerNet(nn.Module):
         #finsh attention mechanism of graph and k_triplet
         
         # pooled_triplets = E_T * scores.unsqueeze(-1)  # [E,K,d]
-
 
         pooled_triplets = []
         pooled_masks = []
@@ -448,9 +296,6 @@ class STGraphTransformerNet(nn.Module):
 
                 continue
 
-            # ---------------------------------------------
-            # Top-K grounded triplets
-            # ---------------------------------------------
 
             Kb = min(max_triplets, t_b.size(0))
 
@@ -461,9 +306,6 @@ class STGraphTransformerNet(nn.Module):
             # optional value projection
             selected = self.W_v(selected)
 
-            # ---------------------------------------------
-            # Padding
-            # ---------------------------------------------
 
             if Kb < max_triplets:
 
@@ -490,9 +332,6 @@ class STGraphTransformerNet(nn.Module):
             pooled_triplets.append(selected)
             pooled_masks.append(mask)
 
-        # =====================================================
-        # Stack
-        # =====================================================
 
         pooled_triplets = torch.stack(
             pooled_triplets,
@@ -503,10 +342,6 @@ class STGraphTransformerNet(nn.Module):
             pooled_masks,
             dim=0
         )                                    # [B,K]
-
-        # =====================================================
-        # Batch index for valid triplets
-        # =====================================================
 
         triplet_batch_idx = (
             torch.arange(B, device=device)
@@ -555,8 +390,8 @@ class STGraphTransformerNet(nn.Module):
             node_raw, bbox, cls_id, conf,
         )  # (N, dim)
         
-        if self.training:
-            h = F.dropout(h, p=self.dropout, training=True)
+        # if self.training:
+        #     h = F.dropout(h, p=self.dropout, training=True)
         
         for block in self.blocks:
             h_residual = h
@@ -572,13 +407,15 @@ class STGraphTransformerNet(nn.Module):
 
         node_feat = h
         
+        
+    
         E_z = self._compute_causal_signals(
             cls_id=cls_id,
             batch_idx=batch_idx,
             B=B
         )
         
-        casual_feature, triplet_mask, triplet_batch_idx = self.compute_graph_relational(
+        graph_relational_feature, triplet_mask, triplet_batch_idx = self.compute_graph_relation(
             s_idx=s_idx,
             node_feature = node_feat,
             cls_id=cls_id,
@@ -588,11 +425,11 @@ class STGraphTransformerNet(nn.Module):
         )   
 
 
-        
+        #pleaes fuse the correponding features as required by the visual question module, and then pass them to the final mlp for classification
         question_visual,ecl_question_visual, feature_fused, feature_causal_fused, causal_fused,question_mask, ecl_masks=  self.visual_question(
                 node_feat = None,
                 motion_video_feat = motion_feat,
-                casual_embedding = None,
+                casual_embedding = graph_relational_feature,
                 question_embedding = question_emb,
                 e_cl_embedding = None,
                 answer_embedding = None,
