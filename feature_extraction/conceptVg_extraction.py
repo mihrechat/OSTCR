@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch
 import os
-from models.languageEncoder.question_extract import DebertaEncoder
+from .Language_Encoder.question_extract import DebertaEncoder
 from tqdm import tqdm
 import random
 
@@ -329,7 +329,6 @@ def build_hybrid_knowledge_banks(conceptnet_csv, relationship_path, scene_dir, s
 # =====================================================================
 # RUN ONCE OFFLINE: Convert JSON text to embedded Tensors
 # =====================================================================
-# Assuming YOLO_CLASS_VOCAB is imported or defined at the top of your script
 # e.g., YOLO_CLASS_VOCAB = {"person": 0, "bicycle": 1, "car": 2, ...}
 
 def encode_banks_to_tensors(triplet_json_path, prior_json_path, bank_path):
