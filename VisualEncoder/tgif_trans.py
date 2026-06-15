@@ -10,8 +10,8 @@ import torch.nn.functional as F
 from .ST_block import SpatioTemporalBlock
 from .node_attribute_encoder import NodeAttributeEncoder
 import os
-from languageEncoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
-from models.multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, MultiChoiceClassifier, MultiChoices
+from Language_Encoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
+from .multiEncoder.cross_encoder_updated import OSTCRModule_Transformer, MultiChoices
 
 
 class ConceptNetTripletBank(nn.Module):
@@ -68,7 +68,7 @@ class STGraphTransformerNet(nn.Module):
         )
         self.edge_embed = nn.Embedding(cfg.model.num_preds, self.edge_dim)
         
-        self.visual_question  = GraphSTCausalMotion_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens)
+        self.visual_question  = OSTCRModule_Transformer(cfg.model.motion_dim, self.dim, cfg.model.concept_dim, cfg.model.text_dim, cfg.model.dim, cfg.model.num_heads, cfg.model.num_layers, cfg.model.num_tokens)
         
    
         self.blocks = nn.ModuleList([
@@ -116,7 +116,7 @@ class STGraphTransformerNet(nn.Module):
             return E_z
     
     
-    def _compute_triplet_mediator(
+    def compute_graph_relation(
         self,
         s_idx,             # [2,E]
         cls_id,            # [N]
@@ -320,13 +320,13 @@ class STGraphTransformerNet(nn.Module):
         
        
         
-        E_z = self._compute_causal_signals(
+        E_z = self.compute_causal_signal(
             cls_id=cls_id,
             batch_idx=batch_idx,
             B=B
         )
         
-        casual_feature, triplet_mask = self._compute_triplet_mediator(
+        casual_feature, triplet_mask = self.compute_graph_relation(
             s_idx=s_idx,
             cls_id=cls_id,
             batch_idx=batch_idx,
