@@ -24,7 +24,7 @@ from data_class_open_ended import get_args
 from build_dataset import MSVDDatasetMotion
 from torch.optim.lr_scheduler import ReduceLROnPlateau,  CosineAnnealingLR, LinearLR
 from torch.amp import GradScaler, autocast
-from models.visualEncoder.msvd_revised_transformer import STGraphTransformerNet
+from models.VisualEncoder.msvd import STGraphTransformerNet #please change here open-ended question models $msvd, msvrt,....
 from model_loss_stud import build_losses, compute_total_loss
 from build_dataset import stgraph_collate
 
