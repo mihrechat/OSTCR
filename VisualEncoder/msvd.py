@@ -12,8 +12,8 @@ from .node_attribute_encoder import NodeAttributeEncoder
 from torch_geometric.utils import softmax as pyg_softmax
 import os
 from torch_geometric.utils import dropout_edge
-from languageEncoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
-from models.multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, OpenEndedClassification
+from Language_Encoder.linguistic_prior import HierarchicalLinguisticPriorBank,ConceptNetExpectedPriorBank
+from multiEncoder.cross_encoder_updated import GraphSTCausalMotion_Transformer, OpenEndedClassification
 from torch_scatter import scatter_mean
 from torch_scatter import scatter, scatter_sum
 
