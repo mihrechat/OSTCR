@@ -24,7 +24,7 @@ json_filterd_question = '/root/autodl-tmp/CausalSTGNet/datasets/open_ended_vqa/M
 mapping_dir       = '/root/autodl-tmp/CausalSTGNet/datasets/open_ended_vqa/MSVD/prior_memory/youtube_mapping.txt'
 data_dir         =  '/root/autodl-tmp/CausalSTGNet/datasets/open_ended_vqa/MSVD/YouTubeClips'
 # Define the Question Types
-MSVD_QTYPES = {
+MSVD_QTYPES = {  #change to msrvt question types too to extract question from msvrrt
     'what': 0,
     'who': 1,
     'how': 2,
@@ -152,7 +152,7 @@ def build_msvd_vocabs_and_priors(train_json, valid_json, test_json, ln_output_di
             role_token_counts[role_token] += 1
             total_role_tokens += 1
     
-    MIN_FREQ = 2
+    MIN_FREQ = 2 # keep question with maximum two question at least
     
     # --- Build Answer Vocab ---
     answer_vocab = {"<UNK>": 0}
@@ -385,15 +385,15 @@ def build_msvrtt_vocabs_and_priors(train_csv, test_csv, ln_output_dir):
         p_tau = count / total_role_tokens
         role_token_info[tr] = {"idx": role_token_to_idx[tr], "count": count, "prob": p_tau}
         emb, mask = encoder.encode(tr, add_special_tokens=False, max_length=4)  # 
-        print(f'------------question role type shape extracted before mask -------: {emb.shape}')
+        # print(f'------------question role type shape extracted before mask -------: {emb.shape}')
         emb = torch.tensor(emb[mask.astype(bool)])
         if emb.shape[0] > 1:
             emb = emb.mean(dim=0)
         else:
             emb = emb[0]
-        print(f'------------question role type shape extracted after mask -------: {emb.shape}')
+        # print(f'------------question role type shape extracted after mask -------: {emb.shape}')
         # emb = torch.tensor(encoder.encode(tr))
-        role_token_expected_embs[role_token_to_idx[tr]] = p_tau * emb 
+        role_token_expected_embs[role_token_to_idx[tr]] = emb 
 
     
         
