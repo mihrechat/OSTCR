@@ -9,11 +9,6 @@ from ultralytics import YOLO
 from typing import Dict, List, Tuple, Optional, Union
 
 
-# ==================================================================
-# PART 1: IMPROVED MASK EXTRACTION (Direct from frame + YOLO box)
-# ==================================================================
-
-
 import torch
 import torch.nn.functional as F
 import cv2
@@ -21,9 +16,7 @@ import numpy as np
 from typing import List, Optional, Tuple
 
 
-# ==================================================================
-# OPTION 1: SIMPLE GPU-BASED MASK (Fastest - 50x speedup)
-# ==================================================================
+
 
 def load_gif_frames(path):
     img = Image.open(path)
@@ -35,7 +28,7 @@ def load_gif_frames(path):
 
 class GPUMaskExtractor:
     """
-    ⚡ Ultra-fast GPU mask extraction using morphological operations.
+     Ultra-fast GPU mask extraction using morphological operations.
     
     Performance:
     - GrabCut: ~500ms per object
@@ -55,7 +48,7 @@ class GPUMaskExtractor:
         """
         Extract masks for multiple objects (GPU-accelerated).
         
-        ⚡ FAST: ~10ms for 10 objects
+         FAST: ~10ms for 10 objects
         
         Args:
             frame_np: Full-resolution frame (H, W, 3)
@@ -117,7 +110,7 @@ class GPUMaskExtractor:
 
 # class SAMMaskExtractor:
 #     """
-#     ⚡ SAM (Segment Anything Model) for better mask quality.
+#      SAM (Segment Anything Model) for better mask quality.
     
 #     Performance:
 #     - Quality: Better boundaries than GrabCut
@@ -142,7 +135,7 @@ class GPUMaskExtractor:
         
 #         self.predictor = SamPredictor(sam)
 #         self.device = device
-#         print(f"✅ SAM loaded on {device}")
+#         print(f"  SAM loaded on {device}")
     
 #     def extract_mask_batch(
 #         self,
@@ -187,14 +180,7 @@ class GPUMaskExtractor:
 # ==================================================================
 
 class YOLOMaskRefinement:
-    """
-    ⚡ Use YOLO masks + GPU refinement for best balance.
     
-    Performance:
-    - Fast: Uses YOLO's native masks (already available!)
-    - Better: GPU refinement improves quality
-    - Smart: Upscales YOLO masks to full resolution
-    """
     
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -206,20 +192,7 @@ class YOLOMaskRefinement:
         smooth: bool = True,
         smooth_kernel_size: int = 5,
     ) -> List[np.ndarray]:
-        """
-        Upscale and refine YOLO masks on GPU.
         
-        ⚡ FASTEST: Uses YOLO's native masks!
-        
-        Args:
-            yolo_masks: YOLO's mask output (lower resolution)
-            target_shape: Target resolution (original frame size)
-            smooth: Apply Gaussian smoothing
-            smooth_kernel_size: Smoothing kernel size
-        
-        Returns:
-            masks: List of upscaled masks
-        """
         H_target, W_target = target_shape
         
         # Convert to GPU tensor
@@ -259,21 +232,7 @@ def extract_mask_from_yolo_box(
     bbox: List[float],
     method: str = "grabcut",
 ) -> Optional[np.ndarray]:
-    """
-    Extract high-resolution object mask from YOLO bounding box.
     
-    ✅ Avoids YOLO's low-res mask (640×384)!
-    ✅ Uses GrabCut for better boundaries
-    ✅ Returns full-resolution mask
-    
-    Args:
-        frame_np: Full-resolution frame (e.g., 1280×720)
-        bbox: YOLO bbox [x1, y1, x2, y2]
-        method: 'grabcut' (best) or 'threshold'
-    
-    Returns:
-        mask: High-resolution binary mask (H, W)
-    """
     
     H, W = frame_np.shape[:2]
     mask = np.zeros((H, W), dtype=np.uint8)
@@ -284,7 +243,7 @@ def extract_mask_from_yolo_box(
     x2, y2 = min(W, int(x2) + 5), min(H, int(y2) + 5)
     
     if method == "grabcut":
-        # ✅ GRABCUT: Better boundary detection
+        # GRABCUT: Better boundary detection, but slow
         try:
             bgdModel = np.zeros((1, 65), np.float64)
             fgdModel = np.zeros((1, 65), np.float64)
@@ -305,11 +264,11 @@ def extract_mask_from_yolo_box(
             mask = mask.astype(np.uint8)
             
         except Exception as e:
-            print(f"    ⚠️  GrabCut failed: {e}, using threshold")
+            print(f"      GrabCut failed: {e}, using threshold")
             method = "threshold"
     
     if method == "threshold":
-        # ✅ THRESHOLD: Fast alternative
+        #  THRESHOLD: Fast alternative
         # Create simple rectangular mask
         mask = np.zeros((H, W), dtype=np.uint8)
         mask[y1:y2, x1:x2] = 1
@@ -322,17 +281,7 @@ def extract_masks_high_resolution(
     boxes: np.ndarray,
     method: str = "grabcut",
 ) -> List[np.ndarray]:
-    """
-    Extract high-resolution masks for multiple objects.
-    
-    Args:
-        frame_np: Full-resolution frame
-        boxes: (N, 4) YOLO boxes [x1, y1, x2, y2]
-        method: 'grabcut' or 'threshold'
-    
-    Returns:
-        masks: List of (H, W) binary masks
-    """
+   
     masks = []
     for bbox in boxes:
         mask = extract_mask_from_yolo_box(frame_np, bbox, method)
@@ -344,9 +293,7 @@ def extract_masks_high_resolution(
     return masks
 
 
-# ==================================================================
-# PART 2: IMPROVED RelTR MATCHING
-# ==================================================================
+
 
 def improved_match_reltr_to_yolo(
     reltr_boxes: torch.Tensor,        # (K, 4) normalized
@@ -356,17 +303,7 @@ def improved_match_reltr_to_yolo(
     iou_thresh: float = 0.3,
     center_dist_thresh: float = 0.15,
 ) -> Dict[int, int]:
-    """
-    ✅ IMPROVED: Match RelTR boxes to YOLO objects.
     
-    Uses multiple cues:
-    1. IoU (primary - box overlap)
-    2. Center distance (secondary)
-    3. Size compatibility (tertiary)
-    
-    Returns:
-        reltr_idx → yolo_id mapping
-    """
     
     H, W = frame_shape
     mapping = {}
@@ -444,10 +381,6 @@ def compute_iou_normalized(box1, box2):
     
     return inter / (union + 1e-6)
 
-
-# ==================================================================
-# PART 3: IMPROVED TEMPORAL RELATIONS
-# ==================================================================
 
 class TemporalRelationDetector:
     """
@@ -574,12 +507,7 @@ def improved_track_and_build_scene_graph(
     use_improved_matching: bool = True,     
     use_temporal_relations: bool = True,    
 ):
-    """
-    ✅ IMPROVED pipeline with:
-    1. High-resolution masks (no YOLO degradation)
-    2. Better RelTR matching (IoU-based)
-    3. Temporal relation detection
-    """
+    
     
     os.makedirs(output_dir, exist_ok=True)
     
@@ -706,7 +634,7 @@ def improved_track_and_build_scene_graph(
             if final_id is None:
                 continue
             
-            # ✅ Encode high-resolution mask
+            
             from pycocotools import mask as mask_util
             try:
                 rle = mask_util.encode(np.asfortranarray(mask_hires.astype(np.uint8)))
@@ -733,7 +661,7 @@ def improved_track_and_build_scene_graph(
             print(" | skipped")
             continue
         
-        # ── RelTR spatial relations ────────────────────────────────
+    
         
         from torchvision import transforms
         
@@ -884,7 +812,7 @@ def improved_track_and_build_scene_graph(
         json.dump(scene_graph, f, indent=4)
     
     print(f"\n{'='*70}")
-    print(f"✅ Scene graph saved!")
+    print(f"  Scene graph saved!")
     print(f"  Frames: {len(frame_indices)}")
     print(f"  Objects: {len(flat_objects)}")
     print(f"  Spatial edges: {len(spatial_edges)}")
@@ -910,7 +838,7 @@ SPLITS = {
     }
 }
 
-RELTR_CKPT = '/root/autodl-tmp/RelTR/ckpt/checkpoint0149.pth'
+RELTR_CKPT = '/root/autodl-tmp/RelTR/ckpt/checkpoint0149.pth' # please download checkpoint
 
 # processing params
 NUM_CLIPS = 1
@@ -974,7 +902,7 @@ if __name__ == "__main__":
 
     reltr_model = load_reltr(RELTR_CKPT, device='cuda')
     
-    # ✅ Get list of videos (not a set!)
+    #  Get list of videos (not a set!)
     train_videos = sorted([
         video for video in os.listdir(TRAIN_VIDEO_ROOT)
         if video.endswith(('.mp4', '.avi', '.mov', '.mkv', '.gif'))
@@ -1001,7 +929,7 @@ if __name__ == "__main__":
 
         # Check if file exists
         if not os.path.exists(video_path):
-            print(f"  ⚠️  Video not found: {video_path}")
+            print(f"    Video not found: {video_path}")
             total_skipped += 1
             continue
 
@@ -1014,7 +942,7 @@ if __name__ == "__main__":
         try:
             print(f"\n  🎬 Processing: {video_name}")
             
-            # ✅ FIX: Pass the DIRECTORY path, not the set!
+            # FIX: Pass the DIRECTORY path, not the set!
             improved_track_and_build_scene_graph(
                 video_dir=TRAIN_VIDEO_ROOT,      
                 video_name=video_name,           
@@ -1026,17 +954,17 @@ if __name__ == "__main__":
                 use_temporal_relations=True,     
             )
             total_processed += 1
-            print(f"  ✅ Success!")
+            print(f"   Success!")
 
         except Exception as e:
-            print(f"  ❌ Error: {str(e)}")
+            print(f"   Error: {str(e)}")
             import traceback
             traceback.print_exc()  # ← Shows full error details
             total_error += 1
 
     print("\n" + "="*70)
     print("--- SUMMARY ---")
-    print(f"  ✅ Processed: {total_processed}")
-    print(f"  ⏭️  Skipped: {total_skipped}")
-    print(f"  ❌ Errors: {total_error}")
+    print(f"   Processed: {total_processed}")
+    print(f"    Skipped: {total_skipped}")
+    print(f"   Errors: {total_error}")
     print("="*70)
