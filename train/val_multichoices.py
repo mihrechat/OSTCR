@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import torch
 from tqdm import tqdm
-from models.visualEncoder.trans_revised_transformer import STGraphTransformerNet
+from models.VisualEncoder.tgif_trans import *
 # from models.visualEncoder.no_causal_stud_motion import STGraphTransformerNet
 from data_class_multi_choice import get_args
 from build_dataset import STUDTrafficDatasetMotion, stgraph_collate
@@ -140,8 +140,8 @@ if __name__ == "__main__":
     cfg = get_args()
     cfg.model.test = True
     print(f'--------Testing model----------------: {cfg.model.test}')
-    model = STGraphTransformerNet(cfg).to(device) 
-    dataset = STUDTrafficDatasetMotion(cfg, "test")
+    model = STGraphTransformerNet(cfg).to(device) # import the corresponding models for validation
+    dataset = STUDTrafficDatasetMotion(cfg, "test") #
         
     # n_val   = max(1, int(len(dataset) * cfg.data.val_split))
     # n_train = len(dataset) - n_val
