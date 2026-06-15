@@ -10,13 +10,6 @@ from typing import Dict, List, Tuple, Optional, Union
 from torchvision import transforms
 import cv2
 from PIL import Image
-
-
-# ==================================================================
-# PART 1: IMPROVED MASK EXTRACTION (Direct from frame + YOLO box)
-# ==================================================================
-
-
 import torch
 import torch.nn.functional as F
 import cv2
@@ -24,9 +17,6 @@ import numpy as np
 from typing import List, Optional, Tuple
 
 
-# ==================================================================
-# OPTION 1: SIMPLE GPU-BASED MASK (Fastest - 50x speedup)
-# ==================================================================
 
 def load_gif_frames(path):
     img = Image.open(path)
@@ -37,13 +27,6 @@ def load_gif_frames(path):
     return frames
 
 class GPUMaskExtractor:
-    """
-    ⚡ Ultra-fast GPU mask extraction using morphological operations.
-    
-    Performance:
-    - GrabCut: ~500ms per object
-    - This: ~10ms per object (50x faster!)
-    """
     
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -55,20 +38,7 @@ class GPUMaskExtractor:
         expansion: float = 1.1,  # Expand box by 10%
         dilation_kernel_size: int = 5,
     ) -> List[np.ndarray]:
-        """
-        Extract masks for multiple objects (GPU-accelerated).
-        
-        ⚡ FAST: ~10ms for 10 objects
-        
-        Args:
-            frame_np: Full-resolution frame (H, W, 3)
-            boxes: (N, 4) bounding boxes
-            expansion: Box expansion factor (1.1 = 10% larger)
-            dilation_kernel_size: Morphological dilation kernel
-        
-        Returns:
-            masks: List of (H, W) binary masks
-        """
+ 
         H, W = frame_np.shape[:2]
         masks = []
         
@@ -120,7 +90,7 @@ class GPUMaskExtractor:
 
 # class SAMMaskExtractor:
 #     """
-#     ⚡ SAM (Segment Anything Model) for better mask quality.
+#       SAM (Segment Anything Model) for better mask quality.
     
 #     Performance:
 #     - Quality: Better boundaries than GrabCut
@@ -145,7 +115,7 @@ class GPUMaskExtractor:
         
 #         self.predictor = SamPredictor(sam)
 #         self.device = device
-#         print(f"✅ SAM loaded on {device}")
+#         print(f"  SAM loaded on {device}")
     
 #     def extract_mask_batch(
 #         self,
@@ -190,14 +160,6 @@ class GPUMaskExtractor:
 # ==================================================================
 
 class YOLOMaskRefinement:
-    """
-    ⚡ Use YOLO masks + GPU refinement for best balance.
-    
-    Performance:
-    - Fast: Uses YOLO's native masks (already available!)
-    - Better: GPU refinement improves quality
-    - Smart: Upscales YOLO masks to full resolution
-    """
     
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -209,20 +171,7 @@ class YOLOMaskRefinement:
         smooth: bool = True,
         smooth_kernel_size: int = 5,
     ) -> List[np.ndarray]:
-        """
-        Upscale and refine YOLO masks on GPU.
         
-        ⚡ FASTEST: Uses YOLO's native masks!
-        
-        Args:
-            yolo_masks: YOLO's mask output (lower resolution)
-            target_shape: Target resolution (original frame size)
-            smooth: Apply Gaussian smoothing
-            smooth_kernel_size: Smoothing kernel size
-        
-        Returns:
-            masks: List of upscaled masks
-        """
         H_target, W_target = target_shape
         
         # Convert to GPU tensor
@@ -262,21 +211,7 @@ def extract_mask_from_yolo_box(
     bbox: List[float],
     method: str = "grabcut",
 ) -> Optional[np.ndarray]:
-    """
-    Extract high-resolution object mask from YOLO bounding box.
     
-    ✅ Avoids YOLO's low-res mask (640×384)!
-    ✅ Uses GrabCut for better boundaries
-    ✅ Returns full-resolution mask
-    
-    Args:
-        frame_np: Full-resolution frame (e.g., 1280×720)
-        bbox: YOLO bbox [x1, y1, x2, y2]
-        method: 'grabcut' (best) or 'threshold'
-    
-    Returns:
-        mask: High-resolution binary mask (H, W)
-    """
     
     H, W = frame_np.shape[:2]
     mask = np.zeros((H, W), dtype=np.uint8)
@@ -287,7 +222,6 @@ def extract_mask_from_yolo_box(
     x2, y2 = min(W, int(x2) + 5), min(H, int(y2) + 5)
     
     if method == "grabcut":
-        # ✅ GRABCUT: Better boundary detection
         try:
             bgdModel = np.zeros((1, 65), np.float64)
             fgdModel = np.zeros((1, 65), np.float64)
@@ -308,11 +242,10 @@ def extract_mask_from_yolo_box(
             mask = mask.astype(np.uint8)
             
         except Exception as e:
-            print(f"    ⚠️  GrabCut failed: {e}, using threshold")
+            print(f"    GrabCut failed: {e}, using threshold")
             method = "threshold"
     
     if method == "threshold":
-        # ✅ THRESHOLD: Fast alternative
         # Create simple rectangular mask
         mask = np.zeros((H, W), dtype=np.uint8)
         mask[y1:y2, x1:x2] = 1
@@ -325,17 +258,7 @@ def extract_masks_high_resolution(
     boxes: np.ndarray,
     method: str = "grabcut",
 ) -> List[np.ndarray]:
-    """
-    Extract high-resolution masks for multiple objects.
     
-    Args:
-        frame_np: Full-resolution frame
-        boxes: (N, 4) YOLO boxes [x1, y1, x2, y2]
-        method: 'grabcut' or 'threshold'
-    
-    Returns:
-        masks: List of (H, W) binary masks
-    """
     masks = []
     for bbox in boxes:
         mask = extract_mask_from_yolo_box(frame_np, bbox, method)
@@ -359,17 +282,6 @@ def improved_match_reltr_to_yolo(
     iou_thresh: float = 0.3,
     center_dist_thresh: float = 0.15,
 ) -> Dict[int, int]:
-    """
-    ✅ IMPROVED: Match RelTR boxes to YOLO objects.
-    
-    Uses multiple cues:
-    1. IoU (primary - box overlap)
-    2. Center distance (secondary)
-    3. Size compatibility (tertiary)
-    
-    Returns:
-        reltr_idx → yolo_id mapping
-    """
     
     H, W = frame_shape
     mapping = {}
@@ -448,9 +360,6 @@ def compute_iou_normalized(box1, box2):
     return inter / (union + 1e-6)
 
 
-# ==================================================================
-# PART 3: IMPROVED TEMPORAL RELATIONS
-# ==================================================================
 
 class TemporalRelationDetector:
     """
@@ -577,12 +486,7 @@ def improved_track_and_build_scene_graph(
     use_improved_matching: bool = True,     
     use_temporal_relations: bool = True,    
 ):
-    """
-    ✅ IMPROVED pipeline with:
-    1. High-resolution masks (no YOLO degradation)
-    2. Better RelTR matching (IoU-based)
-    3. Temporal relation detection
-    """
+    
     
     os.makedirs(output_dir, exist_ok=True)
     
@@ -670,10 +574,9 @@ def improved_track_and_build_scene_graph(
     global_idx = 0
     next_untracked_id = -1
     
-    # ── Frame loop ─────────────────────────────────────────────────
     #process the first 650 frames always to avoid memory explosion
-    print(f"🎞️  Processing {min(len(l_results), 650)} frames...\n")
-    # print(f"🎞️  Processing {len(l_results[:] )} frames...\n")
+    print(f"  Processing {min(len(l_results), 650)} frames...\n")
+    # print(f"  Processing {len(l_results[:] )} frames...\n")
     
     # for frame_idx, result in enumerate(l_results):
     for frame_idx, result in enumerate(l_results[:650]):
@@ -723,7 +626,7 @@ def improved_track_and_build_scene_graph(
                 final_id = next_untracked_id
                 next_untracked_id -= 1
             
-            # ✅ Encode high-resolution mask
+     
             from pycocotools import mask as mask_util
             try:
                 rle = mask_util.encode(np.asfortranarray(mask_hires.astype(np.uint8)))
@@ -770,18 +673,18 @@ def improved_track_and_build_scene_graph(
                     
                     frame_pil = Image.fromarray(rgb_frame)
                 else:
-                    print(f"  ⚠️  Frame has zero dimensions")
+                    print(f"    Frame has zero dimensions")
             else:
-                print(f"  ⚠️  Invalid frame format")
+                print(f"    Invalid frame format")
                 
         except cv2.error as e:
-            print(f"  ⚠️  OpenCV error: {e}")
+            print(f"    OpenCV error: {e}")
         except Exception as e:
-            print(f"  ⚠️  Error converting frame to PIL: {e}")
+            print(f"    Error converting frame to PIL: {e}")
 
         # Skip if conversion failed
         if frame_pil is None:
-            print(f"  ⚠️  Failed to convert frame to PIL, skipping RelTR")
+            print(f"    Failed to convert frame to PIL, skipping RelTR")
             continue
 
         # Apply transforms
@@ -795,17 +698,17 @@ def improved_track_and_build_scene_graph(
         try:
             img_t = RELTR_TRANSFORM(frame_pil).unsqueeze(0).to(device)
         except Exception as e:
-            print(f"  ⚠️  Error transforming frame for RelTR: {e}")
+            print(f"    Error transforming frame for RelTR: {e}")
 
         if img_t is None:
-            print(f"  ⚠️  Failed to transform frame for RelTR, skipping")
+            print(f"    Failed to transform frame for RelTR, skipping")
             continue
             
         with torch.no_grad():
             outputs = reltr_model(img_t)
             
         if outputs is None:
-            print(f"  ⚠️  RelTR failed to produce outputs, skipping")
+            print(f"    RelTR failed to produce outputs, skipping")
             continue
         
         probas = outputs["rel_logits"].softmax(-1)[0, :, :-1]
@@ -937,7 +840,7 @@ def improved_track_and_build_scene_graph(
     }
     
     if len(frame_indices) < 2:
-        print(f"⚠️  No valid frames processed for video {video_id}, skipping save.")
+        print(f"  No valid frames processed for video {video_id}, skipping save.")
         return
     
     # ── Save ───────────────────────────────────────────────────────
@@ -945,7 +848,7 @@ def improved_track_and_build_scene_graph(
         json.dump(scene_graph, f, indent=4)
     
     print(f"\n{'='*70}")
-    print(f"✅ Scene graph saved!")
+    print(f" Scene graph saved!")
     print(f"  Frames: {len(frame_indices)}")
     print(f"  Objects: {len(flat_objects)}")
     print(f"  Spatial edges: {len(spatial_edges)}")
@@ -1027,19 +930,19 @@ def already_processed(video_stem):
                 scene_graph = json.load(f)
             frame_indices = scene_graph.get("frame_indices", [])
             if len(frame_indices) < 2:
-                print(f"  ⚠️  Existing JSON has insufficient frames ({len(frame_indices)}), reprocessing...")
+                print(f"    Existing JSON has insufficient frames ({len(frame_indices)}), reprocessing...")
                 os.remove(json_path)
                 return False
             if len(frame_indices) > 750:
-                print(f"  ⚠️  Existing JSON has too many frames ({len(frame_indices)}), reprocessing with warning...")
+                print(f"    Existing JSON has too many frames ({len(frame_indices)}), reprocessing with warning...")
                 os.remove(json_path)
                 return False
         except Exception as e:
-            print(f"  ⚠️  Error reading existing JSON: {e}, reprocessing...")
+            print(f"    Error reading existing JSON: {e}, reprocessing...")
             if os.path.exists(json_path):
                 os.remove(json_path)
             return False
-        print(f"  ✅ Existing JSON is valid with {len(frame_indices)} frames, skipping processing.")
+        print(f"   Existing JSON is valid with {len(frame_indices)} frames, skipping processing.")
         return True
     # return (
     #     os.path.exists(os.path.join(TRAIN_OUTPUT, video_stem + ".json")) 
@@ -1057,7 +960,7 @@ if __name__ == "__main__":
 
     reltr_model = load_reltr(RELTR_CKPT, device='cuda')
     
-    # ✅ Get list of videos (not a set!)
+    # Get list of videos (not a set!)
     train_videos = sorted([
         video for video in os.listdir(TRAIN_VIDEO_ROOT)
         if video.endswith(('.mp4', '.avi', '.mov', '.mkv', '.gif'))
@@ -1084,7 +987,7 @@ if __name__ == "__main__":
 
         # Check if file exists
         if not os.path.exists(video_path):
-            print(f"  ⚠️  Video not found: {video_path}")
+            print(f"    Video not found: {video_path}")
             total_skipped += 1
             continue
 
@@ -1108,17 +1011,17 @@ if __name__ == "__main__":
                 use_temporal_relations=True,     
             )
             total_processed += 1
-            print(f"  ✅ Success!")
+            print(f"   Success!")
 
         except Exception as e:
-            print(f"  ❌ Error: {str(e)}")
+            print(f"   Error: {str(e)}")
             import traceback
             traceback.print_exc()  # ← Shows full error details
             total_error += 1
 
     print("\n" + "="*70)
     print("--- SUMMARY ---")
-    print(f"  ✅ Processed: {total_processed}")
-    print(f"  ⏭️  Skipped: {total_skipped}")
-    print(f"  ❌ Errors: {total_error}")
+    print(f"   Processed: {total_processed}")
+    print(f"    Skipped: {total_skipped}")
+    print(f"   Errors: {total_error}")
     print("="*70)
