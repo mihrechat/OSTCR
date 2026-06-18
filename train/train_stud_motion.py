@@ -18,10 +18,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torch_geometric.data import Data, Batch as PyGBatch
 # from data_class_stud import get_args
-from data_class_stud_nocausal import get_args
+from data_class_multi_choice import get_args
 from build_dataset import STUDTrafficDatasetMotion
 # from models.visualEncoder.causal_STCR_stud_motion import STGraphTransformerNet
-from models.visualEncoder.no_causal_stud_motion import STGraphTransformerNet
+from VisualEncoder.stud_traffic import STGraphTransformerNet
 from build_dataset import stgraph_collate
 from model_loss_stud import build_losses, compute_total_loss
 
