@@ -109,7 +109,7 @@ if __name__ == "__main__":
     )
 
     print(
-        f"✅ Loaded model from epoch "
+        f"Loaded model from epoch "
         f"{checkpoint.get('epoch', 'Unknown')}"
     )
 
@@ -125,13 +125,13 @@ if __name__ == "__main__":
 
         eval_model = ema.module
 
-        print("✅ EMA weights loaded")
+        print(" EMA weights loaded")
 
     else:
 
         eval_model = model
 
-        print("⚠️ EMA weights not found, using raw model")
+        print(" EMA weights not found, using raw model")
 
     # =====================================================
     # Evaluation mode
@@ -157,14 +157,14 @@ if __name__ == "__main__":
     #     # Your training script saved the weights under the key 'model'
     #     model.load_state_dict(checkpoint['model'])
     #     saved_epoch = checkpoint.get('epoch', 'Unknown')
-    #     print(f"✅ Successfully loaded weights from Epoch {saved_epoch}-accuracy {checkpoint.get('best_acc', 'Unknown')}")
+    #     print(f" Successfully loaded weights from Epoch {saved_epoch}-accuracy {checkpoint.get('best_acc', 'Unknown')}")
     # elif 'model_state_dict' in checkpoint:
     #     model.load_state_dict(checkpoint['model_state_dict'])
     #     saved_epoch = checkpoint.get('epoch', 'Unknown')
-    #     print(f"✅ Successfully loaded weights from Epoch {saved_epoch}")
+    #     print(f" Successfully loaded weights from Epoch {saved_epoch}")
     # else:
     #     model.load_state_dict(checkpoint)
-    #     print("✅ Successfully loaded raw model weights")
+    #     print(" Successfully loaded raw model weights")
 
     # # 4. Set the model to Evaluation Mode (CRITICAL: disables Dropout and sets BatchNorm correctly)
     # model.eval()
