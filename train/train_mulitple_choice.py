@@ -24,7 +24,7 @@ from torch_geometric.data import Data, Batch as PyGBatch
 from data_class_multi_choice import get_args
 from build_dataset import TGIFDatasetMotion, stgraph_collate
 from torch.amp import GradScaler, autocast
-from models.visualEncoder.trans_revised_transformer import STGraphTransformerNet
+from VisualEncoder.trans_revised_transformer import STGraphTransformerNet
 from model_loss_stud import build_losses, compute_total_loss
 
 CUDA_LAUNCH_BLOCKING=1
@@ -336,7 +336,7 @@ def train_one_epoch(
              
                 if global_batch_idx + step >= warmup_iters:
                     current_scheduler = 'plateau'
-                    log.info(f"✅ Warmup complete at batch {global_batch_idx + step}! Switching to ReduceLROnPlateau")
+                    log.info(f" Warmup complete at batch {global_batch_idx + step}! Switching to ReduceLROnPlateau")
             
         # ── accumulate metrics ────────────────────────────────────
         total_loss += losses["loss"].item()
