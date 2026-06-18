@@ -24,13 +24,13 @@ from data_class_open_ended import get_args
 from build_dataset import MSVDDatasetMotion
 from torch.optim.lr_scheduler import ReduceLROnPlateau,  CosineAnnealingLR, LinearLR
 from torch.amp import GradScaler, autocast
-from models.VisualEncoder.msvd import STGraphTransformerNet #please change here open-ended question models $msvd, msvrt,....
+from VisualEncoder.msvd import STGraphTransformerNet #please change here open-ended question models $msvd, msvrt,....
 from model_loss_stud import build_losses, compute_total_loss
 from build_dataset import stgraph_collate
 
 CUDA_LAUNCH_BLOCKING=1
 class EarlyStopping:
-    """FIXED: Proper early stopping with patience and best model saving."""
+    """proper early stopping with patience and best model saving."""
     
     def __init__(self, patience: int = 10, min_delta: float = 0.0, mode: str = "max"):
         self.patience = patience
@@ -337,7 +337,7 @@ def train_one_epoch(
              
                 if global_batch_idx + step >= warmup_iters:
                     current_scheduler = 'plateau'
-                    log.info(f"✅ Warmup complete at batch {global_batch_idx + step}! Switching to ReduceLROnPlateau")
+                    log.info(f"Warmup complete at batch {global_batch_idx + step}! Switching to ReduceLROnPlateau")
             
             
             
